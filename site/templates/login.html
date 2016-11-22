@@ -1,16 +1,15 @@
 {% extends "_base.html" %}
 
 {% block content %}
-<div class="col-md-6 col-md-offset-3">
-    <div class="well login">
+<div class="col-md-4 col-md-offset-4">
+    <div class="well" style="margin-top : 100px;">
 
         <form class="form-horizontal" method="post" action="/login">
 
             <div class="form-group">
-                <label for="_login" class="col-md-4 control-label">Email or login</label>
+                <label for="_login" class="col-md-4 control-label">Login</label>
                 <div class="col-md-8">
-                    <input type="text" name="login" class="form-control" id="_login" placeholder="Email or login" autocomplete="off">
-                    <p class="help-block">Just input your login or email</p>
+                    <input type="text" name="login" class="form-control" id="_login" placeholder="Login" autocomplete="off">
                 </div>
             </div>
 
@@ -18,7 +17,6 @@
                 <label for="_pwd" class="col-md-4 control-label">Password</label>
                 <div class="col-md-8">
                     <input type="password" name="password" class="form-control" id="_pwd" placeholder="Password" autocomplete="off">
-                    <p class="help-block">Password, huh?</p>
                 </div>
             </div>
 
