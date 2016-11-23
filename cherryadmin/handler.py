@@ -51,7 +51,12 @@ class CherryAdminHandler(object):
 
     def render_error(self, response_code, message):
         cherrypy.response.status = response_code
-        return self.render("error", {"error_messsage" : message, "error_code" : response_code })
+        context = self.context()
+        context.update({
+                "response_code" : response_code,
+                "message" : message,
+            })
+        return self.render("error", **context)
 
     #
     # EXPOSED
@@ -81,12 +86,15 @@ class CherryAdminHandler(object):
 
     @cherrypy.expose
     def default(self, *args, **kwargs):
-        try:
-            view_name = args[0]
-            if not view_name in self.parent["views"]:
-                raise IndexError
-        except IndexError:
+        if not args:
             view_name = "index"
+        else:
+            try:
+                view_name = args[0]
+                if not view_name in self.parent["views"]:
+                    raise IndexError
+            except IndexError:
+                return self.render_error(404, "not found")
 
         context = self.context()
         if not context["user"]:
