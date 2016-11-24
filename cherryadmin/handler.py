@@ -4,6 +4,9 @@ import json
 import cherrypy
 import jinja2
 
+from .context import CherryAdminContext
+from .view import CherryAdminView
+
 api_headers = [
         ["Content-Type", "application/json"],
         ["Connection", "keep-alive"],
@@ -11,11 +14,6 @@ api_headers = [
         ["Access-Control-Allow-Origin", "*"]
     ]
 
-class Context(dict):
-    def message(self, message, level="info"):
-        if not messages in self.keys():
-            self["flash_messages"] = []
-        self["flash_messages"].append([message, level])
 
 
 class CherryAdminHandler(object):
@@ -30,7 +28,7 @@ class CherryAdminHandler(object):
             user_data = json.loads(cherrypy.session["user_data"])
         except Exception:
             user_data = {}
-        context = Context()
+        context = CherryAdminContext()
         context.update({
                 "user" : user_data,
                 "site" : self.parent["site_context_helper"](),
@@ -39,20 +37,17 @@ class CherryAdminHandler(object):
         return context
 
 
-    def render(self, view, **context):
-        template = self.jinja.get_template("{}.html".format(view))
-        context["view"] = view
-        return template.render(**context)
+    def render(self, view):
+        template = self.jinja.get_template("{}.html".format(view.name))
+        return template.render(**view.context)
 
 
     def render_error(self, response_code, message):
         cherrypy.response.status = response_code
         context = self.context()
-        context.update({
-                "response_code" : response_code,
-                "message" : message,
-            })
-        return self.render("error", **context)
+        view = CherryAdminView("error", context, response_code=response_code, message=message)
+        view.create()
+        return self.render(view)
 
     #
     # EXPOSED
@@ -99,9 +94,10 @@ class CherryAdminHandler(object):
         if args:
             args = args[1:]
 
-        view = self.parent["views"][view_name]
-        context = view(context, args, **kwargs)
-        return self.render(view_name, **context)
+        view_class = self.parent["views"][view_name]
+        view = view_class(view_name, context)
+        view.create(*args, **kwargs)
+        return self.render(view)
 
 
 

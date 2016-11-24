@@ -2,16 +2,16 @@ import os
 import cherrypy
 
 from .handler import CherryAdminHandler
+from .context import CherryAdminContext
+from .view import CherryAdminView
 
-__all__ = ["CherryAdmin"]
+__all__ = ["CherryAdmin", "CherryAdminView"]
+
+
 
 script_name =  os.path.basename(os.path.splitext(__file__)[0])
-
 def default_context_helper():
     return {}
-
-def default_view_helper(context, *args, **kwargs):
-    return context
 
 
 default_settings = {
@@ -36,7 +36,7 @@ default_settings = {
         # Application
         #
 
-        "views" : {"index" : default_view_helper},
+        "views" : {"index" : CherryAdminView},
         "api_methods" : {},
         "login_helper" : lambda x, y: False,
         "site_context_helper" : default_context_helper,
@@ -79,7 +79,6 @@ class CherryAdmin():
         self.handler = CherryAdminHandler(self)
 
         cherrypy.tree.mount(self.handler, "/", self.config)
-
         cherrypy.engine.subscribe('start', self.start)
         cherrypy.engine.subscribe('stop', self.stop)
         cherrypy.engine.start()
@@ -94,6 +93,7 @@ class CherryAdmin():
         self.is_running = True
 
     def stop(self):
+        print ("CHERRYADMIN >> Engine is now stopped")
         self.is_running = False
 
     def shutdown(self):
