@@ -42,10 +42,6 @@ class CherryAdminHandler(object):
     def render(self, view, **context):
         template = self.jinja.get_template("{}.html".format(view))
         context["view"] = view
-        #TODO
-        #js_path = os.path.join(config["nebula_root"], "hub", "static", "js", "{}.js".format(view))
-        #if os.path.exists(js_path):
-        #    context["view_js"] = "/static/js/{}.js".format(view)
         return template.render(**context)
 
 
@@ -94,7 +90,7 @@ class CherryAdminHandler(object):
                 if not view_name in self.parent["views"]:
                     raise IndexError
             except IndexError:
-                return self.render_error(404, "not found")
+                return self.render_error(404, "\"{}\" module not found".format(view_name))
 
         context = self.context()
         if not context["user"]:
