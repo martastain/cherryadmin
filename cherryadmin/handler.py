@@ -1,19 +1,11 @@
-import os
 import json
 
 import cherrypy
 import jinja2
 
+from .common import *
 from .context import CherryAdminContext
 from .view import CherryAdminView
-
-api_headers = [
-        ["Content-Type", "application/json"],
-        ["Connection", "keep-alive"],
-        ["Cache-Control", "no-cache"],
-        ["Access-Control-Allow-Origin", "*"]
-    ]
-
 
 
 class CherryAdminHandler(object):
@@ -45,8 +37,11 @@ class CherryAdminHandler(object):
     def render_error(self, response_code, message):
         cherrypy.response.status = response_code
         context = self.context()
-        view = CherryAdminView("error", context, response_code=response_code, message=message)
-        view.create()
+        view = CherryAdminView("error", context)
+        view.build(
+                response_code=response_code,
+                message=message
+            )
         return self.render(view)
 
     #
@@ -87,18 +82,17 @@ class CherryAdminHandler(object):
             except IndexError:
                 return self.render_error(404, "\"{}\" module not found".format(view_name))
 
-        context = self.context()
-        if not context["user"]:
-            return self.render("login", **context)
-
-        if args:
-            args = args[1:]
-
         view_class = self.parent["views"][view_name]
-        view = view_class(view_name, context)
-        view.create(*args, **kwargs)
-        return self.render(view)
+        view = view_class(view_name, self.context())
+        if not view.auth():
+            if not view["user"]:
+                view = CherryAdminView("login", self.context())
+                view.build()
+                return self.render(view)
+            return self.render_error(403, "You are not authorized to view this page")
 
+        view.build(*args, **kwargs)
+        return self.render(view)
 
 
 
