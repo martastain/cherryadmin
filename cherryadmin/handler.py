@@ -1,3 +1,4 @@
+import time
 import json
 
 import cherrypy
@@ -72,6 +73,7 @@ class CherryAdminHandler(object):
 
     @cherrypy.expose
     def default(self, *args, **kwargs):
+        start_time = time.time()
         if not args:
             view_name = "index"
         else:
@@ -92,6 +94,7 @@ class CherryAdminHandler(object):
             return self.render_error(403, "You are not authorized to view this page")
 
         view.build(*args, **kwargs)
+        view["build_time"] = round(time.time() - start_time, 3)
         return self.render(view)
 
 
