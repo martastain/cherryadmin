@@ -4,6 +4,8 @@ import json
 import cherrypy
 import jinja2
 
+from nxtools import *
+
 from .common import *
 from .context import CherryAdminContext
 from .view import CherryAdminView
@@ -99,31 +101,37 @@ class CherryAdminHandler(object):
 
 
 
-#TODO: rewrite api
+
     @cherrypy.expose
-    def api(self, method=False):
+    def api(self, *args, **kwargs):
         for key, value in api_headers:
             cherrypy.response.headers[key] = value
+
+        if not args:
+            return json.dumps({"response" : 400, "message" : "Bad request. No method specified."})
+        else:
+            try:
+                api_method_name = args[0]
+                if not api_method_name in self.parent["api_methods"]:
+                    raise IndexError
+            except IndexError:
+                return self.render_error(404, "\"{}\" api method not found".format(api_method_name))
 
         if cherrypy.request.method != "POST":
             return json.dumps({"response" : 400, "message" : "Bad request. Post expected."})
 
         try:
-            content_length = cherrypy.request.headers['Content-Length']
-            raw_body = cherrypy.request.body.read(int(content_length))
+            raw_body = cherrypy.request.body.read()
             kwargs = json.loads(raw_body)
         except:
             message = log_traceback("Bad request")
             return json.dumps({"response" : 400, "message" : message})
 
         context = self.context()
-        if not context["user"]:
-            return json.dumps({"response" : 401, "message" : "Not logged in"})
 
-        if method in api_methods:
-            try:
-                data = api_methods[method](**kwargs)
-            except:
-                message = log_traceback("Internal server error")
-                return json.dumps({"response" : 500, "message" : message})
-        return json.dumps(data)
+        try:
+            api_method = self.parent["api_methods"][api_method_name]
+            return json.dumps(api_method(**kwargs))
+        except:
+            message = log_traceback("Exception")
+            return json.dumps({"response" : 500, "message" : message})

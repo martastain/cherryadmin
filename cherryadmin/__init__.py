@@ -4,6 +4,7 @@ import cherrypy
 from .handler import CherryAdminHandler
 from .context import CherryAdminContext
 from .view import CherryAdminView
+from .api import CherryAdminApiMethod
 
 __all__ = ["CherryAdmin", "CherryAdminView"]
 
