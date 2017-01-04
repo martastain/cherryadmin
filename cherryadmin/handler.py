@@ -90,6 +90,8 @@ class CherryAdminHandler(object):
         view = view_class(view_name, self.context())
         if not view.auth():
             if not view["user"]:
+                cherrypy.response.status = 401
+                context = self.context()
                 view = CherryAdminView("login", self.context())
                 view.build()
                 return self.render(view)

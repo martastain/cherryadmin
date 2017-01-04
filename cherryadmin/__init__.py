@@ -4,11 +4,8 @@ import cherrypy
 from .handler import CherryAdminHandler
 from .context import CherryAdminContext
 from .view import CherryAdminView
-from .api import CherryAdminApiMethod
 
 __all__ = ["CherryAdmin", "CherryAdminView"]
-
-
 
 script_name =  os.path.basename(os.path.splitext(__file__)[0])
 def default_context_helper():
@@ -64,9 +61,15 @@ class CherryAdmin():
                 'tools.sessions.storage_type' : 'file',
                 'tools.sessions.storage_path' : self["sessions_dir"]
                 },
+
             '/static': {
                 'tools.staticdir.on': True,
                 'tools.staticdir.dir': static_dir
+                },
+
+           '/favicon.ico': {
+                'tools.staticfile.on': True,
+                'tools.staticfile.filename': os.path.join(static_root, static_dir, "img", "favicons", "favicon.ico")
                 },
             }
 
