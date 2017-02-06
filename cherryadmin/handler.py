@@ -57,12 +57,14 @@ class CherryAdminHandler(object):
             return self.render_error(400, "Bad request")
         login = kwargs.get("login", "-")
         password = kwargs.get("password", "-")
-
         user = self.parent["login_helper"](login, password)
         if not user:
+            if kwargs.get("api", False):
+                return json.dumps({"response" : 401, "message" : "Invalid user name / password combination", "data" : {}})
             raise cherrypy.HTTPRedirect("/")
-
         cherrypy.session["user_data"] = json.dumps(user)
+        if kwargs.get("api", False):
+            return json.dumps({"response" : 200, "data" : user})
         raise cherrypy.HTTPRedirect(kwargs.get("from_page", "/"))
 
 
@@ -102,6 +104,15 @@ class CherryAdminHandler(object):
         return self.render(view)
 
 
+    @cherrypy.expose
+    def ping(self, *args, **kwargs):
+        for key, value in api_headers:
+            cherrypy.response.headers[key] = value
+        try:
+            user_data = json.loads(cherrypy.session["user_data"])
+        except Exception:
+            user_data = {}
+        return json.dumps({"response" : 200, "user" : user_data})
 
 
     @cherrypy.expose
@@ -115,9 +126,10 @@ class CherryAdminHandler(object):
             try:
                 api_method_name = args[0]
                 if not api_method_name in self.parent["api_methods"]:
-                    raise IndexError
-            except IndexError:
-                return self.render_error(404, "\"{}\" api method not found".format(api_method_name))
+                    raise KeyError
+            except KeyError:
+                return json.dumps({"response" : 404, "message" : "\"{}\" api method not found".format(api_method_name)})
+        logging.info("Requested api method", api_method_name)
 
         if cherrypy.request.method != "POST":
             return json.dumps({"response" : 400, "message" : "Bad request. Post expected."})

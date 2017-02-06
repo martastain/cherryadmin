@@ -1,12 +1,12 @@
 class CherryAdminView(object):
     def __init__(self, name, context, *args, **kwargs):
         self.context = context
-        self.context["view"] = name
+        self.context["page"]["name"] = name
         self.context["response"] = 200
 
     @property
     def name(self):
-        return self.context["view"]
+        return self.context["page"]["name"]
 
     def __getitem__(self, key):
         return self.context[key]
