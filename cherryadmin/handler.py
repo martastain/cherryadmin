@@ -33,7 +33,7 @@ class CherryAdminHandler(object):
 
 
     def render(self, view):
-        template = self.jinja.get_template("{}.html".format(view.name))
+        template = self.jinja.get_template("{}.html".format(view.view))
         return template.render(**view.context)
 
 
