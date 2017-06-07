@@ -1,11 +1,12 @@
+__all__ = ["CherryAdmin", "CherryAdminView", "CherryAdminRawView"]
+
 import os
 import cherrypy
 
 from .handler import CherryAdminHandler
 from .context import CherryAdminContext
-from .view import CherryAdminView
+from .view import CherryAdminView, CherryAdminRawView
 
-__all__ = ["CherryAdmin", "CherryAdminView"]
 
 script_name =  os.path.basename(os.path.splitext(__file__)[0])
 def default_context_helper():

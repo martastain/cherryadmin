@@ -7,8 +7,8 @@ import jinja2
 from nxtools import *
 
 from .common import *
-from .context import CherryAdminContext
-from .view import CherryAdminView
+from .view import *
+from .context import *
 
 
 class CherryAdminHandler(object):
@@ -33,6 +33,9 @@ class CherryAdminHandler(object):
 
 
     def render(self, view):
+        cherrypy.response.headers["Content-Type"] = view["page"]["mime"]
+        if view.is_raw:
+            return view.body
         template = self.jinja.get_template("{}.html".format(view.view))
         return template.render(**view.context)
 
