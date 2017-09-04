@@ -22,7 +22,7 @@ def site_context_helper():
 
 def page_context_helper():
     return {
-            "name" : "Le page"
+            "name" : "La page"
         }
 
 
