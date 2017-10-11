@@ -22,6 +22,7 @@ default_settings = {
         "templates_dir" : "templates",
         "static_dir" : "static",
         "sessions_dir" : "/tmp/" + script_name + "_sessions",
+        "sessions_timeout" : 60*24*7,
 
         #
         # Server configuration
@@ -59,8 +60,9 @@ class CherryAdmin():
                 'tools.staticdir.root': static_root,
                 'tools.trailing_slash.on' : False,
                 'tools.sessions.on': True,
-                'tools.sessions.storage_type' : 'file',
-                'tools.sessions.storage_path' : self["sessions_dir"]
+                'tools.sessions.storage_class' : cherrypy.lib.sessions.FileSession,
+                'tools.sessions.storage_path' : self["sessions_dir"],
+                'tools.sessions.timeout' : self["sessions_timeout"]
                 },
 
             '/static': {
