@@ -23,6 +23,8 @@ class CherryAdminHandler(object):
     def context(self):
         try:
             user_data = cherrypy.session["user_data"]
+        except KeyError:
+            user_data = {}
         except Exception:
             log_traceback()
             user_data = {}
@@ -66,7 +68,11 @@ class CherryAdminHandler(object):
         user = self.parent["login_helper"](login, password)
         if not user:
             if kwargs.get("api", False):
-                return dump_json({"response" : 401, "message" : "Invalid user name / password combination", "data" : {}})
+                return dump_json({
+                        "response" : 401,
+                        "message" : "Invalid user name / password combination",
+                        "data" : {}
+                    })
             raise cherrypy.HTTPRedirect("/")
         cherrypy.session["user_data"] = user
         if kwargs.get("api", False):
@@ -115,8 +121,9 @@ class CherryAdminHandler(object):
         for key, value in api_headers:
             cherrypy.response.headers[key] = value
         try:
-            user_data = json.loads(decode_if_py3(cherrypy.session["user_data"]))
+            user_data = cherrypy.session["user_data"]
         except KeyError:
+            log_traceback()
             user_data = {}
         except Exception:
             log_traceback()
@@ -130,31 +137,41 @@ class CherryAdminHandler(object):
             cherrypy.response.headers[key] = value
 
         if not args:
-            return dump_json({"response" : 400, "message" : "Bad request. No method specified."})
+            return dump_json({
+                    "response" : 400,
+                    "message" : "Bad request. No method specified."
+                })
         else:
             try:
                 api_method_name = args[0]
                 if not api_method_name in self.parent["api_methods"]:
                     raise KeyError
             except KeyError:
-                return dump_json({"response" : 404, "message" : "\"{}\" api method not found".format(api_method_name)})
+                return dump_json({
+                        "response" : 404,
+                        "message" : "\"{}\" api method not found".format(api_method_name)
+                    })
         logging.info("Requested api method", api_method_name)
 
         if cherrypy.request.method != "POST":
-            return dump_json({"response" : 400, "message" : "Bad request. Post expected."})
+            return dump_json({
+                    "response" : 400,
+                    "message" : "Bad request. Post expected."
+                })
 
         try:
             raw_body = decode_if_py3(cherrypy.request.body.read())
             kwargs = json.loads(raw_body)
-        except:
+        except Exception:
             message = log_traceback("Bad request")
             return dump_json({"response" : 400, "message" : message})
 
         context = self.context()
+        kwargs["user"] = context["user"]
 
         try:
             api_method = self.parent["api_methods"][api_method_name]
             return dump_json(api_method(**kwargs))
-        except:
+        except Exception:
             message = log_traceback("Exception")
             return dump_json({"response" : 500, "message" : message})
