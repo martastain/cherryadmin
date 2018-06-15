@@ -123,12 +123,15 @@ class CherryAdminHandler(object):
         try:
             user_data = cherrypy.session["user_data"]
         except KeyError:
-            log_traceback()
+            response = 401
             user_data = {}
         except Exception:
+            response = 401
             log_traceback()
             user_data = {}
-        return dump_json({"response" : 200, "user" : user_data})
+        else:
+            response = 200
+        return dump_json({"response" : response, "user" : user_data})
 
 
     @cherrypy.expose
@@ -167,7 +170,15 @@ class CherryAdminHandler(object):
             return dump_json({"response" : 400, "message" : message})
 
         context = self.context()
-        kwargs["user"] = context["user"]
+        try:
+            user_data = cherrypy.session["user_data"]
+        except KeyError:
+            log_traceback()
+            user_data = {}
+        except Exception:
+            log_traceback()
+            user_data = {}
+        kwargs["user"] = user_data
 
         try:
             api_method = self.parent["api_methods"][api_method_name]
