@@ -57,12 +57,15 @@ class CherryAdmin():
 
         self.config = {
             '/': {
+                'tools.proxy.on': True,
+                'tools.proxy.local': 'X-Forwarded-Host',
+                'tools.proxy.local': 'Host',
                 'tools.staticdir.root': static_root,
                 'tools.trailing_slash.on' : False,
                 'tools.sessions.on': True,
                 'tools.sessions.storage_class' : cherrypy.lib.sessions.FileSession,
                 'tools.sessions.storage_path' : self["sessions_dir"],
-                'tools.sessions.timeout' : self["sessions_timeout"]
+                'tools.sessions.timeout' : self["sessions_timeout"],
                 },
 
             '/static': {

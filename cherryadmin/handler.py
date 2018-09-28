@@ -13,6 +13,17 @@ from .context import *
 def dump_json(data):
     return encode_if_py3(json.dumps(data))
 
+def get_session(handler, id=None):
+    if not id:
+        return cherrypy.session
+    session = cherrypy.lib.sessions.FileSession(
+            id=id,
+            storage_path=handler.parent.settings["sessions_dir"]
+            )
+    session.acquire_lock()
+    return session
+
+
 class CherryAdminHandler(object):
     def __init__(self, parent):
         self.parent = parent
@@ -71,20 +82,29 @@ class CherryAdminHandler(object):
                 return dump_json({
                         "response" : 401,
                         "message" : "Invalid user name / password combination",
-                        "data" : {}
+                        "data" : {},
+                        "session_id" : cherrypy.session.id
                     })
             raise cherrypy.HTTPRedirect("/")
         cherrypy.session["user_data"] = user
         if kwargs.get("api", False):
-            return dump_json({"response" : 200, "data" : user})
+            return dump_json({
+                "response" : 200,
+                "data" : user,
+                "session_id" : cherrypy.session.id
+                })
         raise cherrypy.HTTPRedirect(kwargs.get("from_page", "/"))
 
 
     @cherrypy.expose
     def logout(self, **kwargs):
-        cherrypy.session["user_data"] = False
-        cherrypy.lib.sessions.expire()
-        raise cherrypy.HTTPRedirect("/")
+        session = get_session(self, kwargs.get("session_id", None))
+        session["user_data"] = False
+        session.delete()
+        if kwargs.get("api"):
+            return dump_json({"response" : 200, "message" : "Logged out"})
+        else:
+            raise cherrypy.HTTPRedirect("/")
 
 
     @cherrypy.expose
@@ -164,16 +184,21 @@ class CherryAdminHandler(object):
 
         try:
             raw_body = decode_if_py3(cherrypy.request.body.read())
-            kwargs = json.loads(raw_body)
+            if raw_body.strip():
+                kwargs = json.loads(raw_body)
+            else:
+                kwargs = {}
         except Exception:
             message = log_traceback("Bad request")
             return dump_json({"response" : 400, "message" : message})
 
         context = self.context()
+
+        session = get_session(self, kwargs.get("session_id", None))
+
         try:
-            user_data = cherrypy.session["user_data"]
+            user_data = session["user_data"]
         except KeyError:
-            log_traceback()
             user_data = {}
         except Exception:
             log_traceback()
