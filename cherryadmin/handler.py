@@ -207,7 +207,16 @@ class CherryAdminHandler(object):
 
         try:
             api_method = self.parent["api_methods"][api_method_name]
-            return dump_json(api_method(**kwargs))
+            response = api_method(**kwargs)
+            if type(response) == dict:
+                return dump_json(response)
+            elif hasattr(response, "dict"):
+                return dump_json(response.dict)
+            else:
+                return dump_json({
+                        "response" : 500,
+                        "message" : "Unexpected response from API: {}".format(type(response))
+                    })
         except Exception:
             message = log_traceback("Exception")
             return dump_json({"response" : 500, "message" : message})
