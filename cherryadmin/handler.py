@@ -1,3 +1,4 @@
+import re
 import time
 import json
 
@@ -51,20 +52,29 @@ class CherryAdminHandler(object):
     def render(self, view):
         cherrypy.response.headers["Content-Type"] = view["page"]["mime"]
         if view.is_raw:
-            return view.body
+            return encode_if_py3(view.body)
         template = self.jinja.get_template("{}.html".format(view.view))
-        return template.render(**view.context)
+        data = template.render(**view.context)
+        if self.parent["minify_html"]:
+            data = re.sub(r'\n\s*', '', data)
+        return data
 
 
     def render_error(self, response_code, message):
         cherrypy.response.status = response_code
         context = self.context()
         view = CherryAdminView("error", context)
+        view["title"] = "Error"
         view.build(
                 response_code=response_code,
                 message=message
             )
         return self.render(view)
+
+
+    def cherrypy_error(self, status, message, traceback, version):
+        return self.render_error(int(status.split()[0]), message)
+
 
     #
     # EXPOSED
@@ -174,7 +184,6 @@ class CherryAdminHandler(object):
                         "response" : 404,
                         "message" : "\"{}\" api method not found".format(api_method_name)
                     })
-        logging.info("Requested api method", api_method_name)
 
         if cherrypy.request.method != "POST":
             return dump_json({
@@ -205,18 +214,23 @@ class CherryAdminHandler(object):
             user_data = {}
         kwargs["user"] = user_data
 
+        logging.info("{} requested api method {}".format(user_data.get("login", "anonymous"), api_method_name))
+
         try:
             api_method = self.parent["api_methods"][api_method_name]
             response = api_method(**kwargs)
             if type(response) == dict:
-                return dump_json(response)
+                pass
             elif hasattr(response, "dict"):
-                return dump_json(response.dict)
+                response = response.dict
             else:
-                return dump_json({
+                response = {
                         "response" : 500,
                         "message" : "Unexpected response from API: {}".format(type(response))
-                    })
+                    }
+            if response["response"] >= 400:
+                logging.error(response.get("message", "Unknown error"))
+            return dump_json(response)
         except Exception:
             message = log_traceback("Exception")
             return dump_json({"response" : 500, "message" : message})
