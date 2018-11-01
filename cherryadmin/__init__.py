@@ -23,6 +23,7 @@ default_settings = {
         "static_dir" : "static",
         "sessions_dir" : "/tmp/" + script_name + "_sessions",
         "sessions_timeout" : 60*24*7,
+        "minify_html" : True,
 
         #
         # Server configuration
@@ -50,6 +51,9 @@ class CherryAdmin():
         self.settings = default_settings
         self.settings.update(kwargs)
 
+        self.is_running = False
+        self.handler = CherryAdminHandler(self)
+
         if not os.path.exists(self["sessions_dir"]):
             os.makedirs(self["sessions_dir"])
 
@@ -66,6 +70,7 @@ class CherryAdmin():
                 'tools.sessions.storage_class' : cherrypy.lib.sessions.FileSession,
                 'tools.sessions.storage_path' : self["sessions_dir"],
                 'tools.sessions.timeout' : self["sessions_timeout"],
+                'error_page.404': self.handler.cherrypy_error,
                 },
 
             '/static': {
@@ -75,7 +80,7 @@ class CherryAdmin():
 
            '/favicon.ico': {
                 'tools.staticfile.on': True,
-                'tools.staticfile.filename': os.path.join(static_root, static_dir, "img", "favicons", "favicon.ico")
+                'tools.staticfile.filename': os.path.join(static_root, static_dir, "img", "favicon.ico")
                 },
             }
 
@@ -84,9 +89,6 @@ class CherryAdmin():
             'server.socket_port': int(self["port"]),
             })
 
-
-        self.is_running = False
-        self.handler = CherryAdminHandler(self)
 
         cherrypy.tree.mount(self.handler, "/", self.config)
         cherrypy.engine.subscribe('start', self.start)
