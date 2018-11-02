@@ -70,7 +70,7 @@ class CherryAdmin():
                 'tools.sessions.storage_class' : cherrypy.lib.sessions.FileSession,
                 'tools.sessions.storage_path' : self["sessions_dir"],
                 'tools.sessions.timeout' : self["sessions_timeout"],
-                'error_page.404': self.handler.cherrypy_error,
+                'error_page.default': self.handler.cherrypy_error,
                 },
 
             '/static': {
