@@ -136,7 +136,8 @@ class CherryAdminHandler(object):
             if not view["user"]:
                 cherrypy.response.status = 401
                 context = self.context()
-                view = CherryAdminView("login", self.context())
+                context["page"]["title"] = "Login"
+                view = CherryAdminView("login", context)
                 view.build()
                 return self.render(view)
             return self.render_error(403, "You are not authorized to view this page")
