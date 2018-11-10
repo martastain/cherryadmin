@@ -5,11 +5,19 @@ import json
 import cherrypy
 import jinja2
 
+try:
+    import htmlmin
+    has_htmlmin = True
+except ImportError:
+    has_htmlmin = False
+
 from nxtools import *
 
 from .common import *
 from .view import *
 from .context import *
+
+
 
 def dump_json(data):
     return encode_if_py3(json.dumps(data))
@@ -55,8 +63,8 @@ class CherryAdminHandler(object):
             return encode_if_py3(view.body)
         template = self.jinja.get_template("{}.html".format(view.view))
         data = template.render(**view.context)
-        if self.parent["minify_html"]:
-            data = re.sub(r'\n\s*', '', data)
+        if has_htmlmin and self.parent["minify_html"]:
+            data = htmlmin.minify(data, remove_comments=True, remove_empty_space=True)
         return data
 
 
