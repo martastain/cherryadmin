@@ -12,6 +12,9 @@ script_name =  os.path.basename(os.path.splitext(__file__)[0])
 def default_context_helper():
     return {}
 
+def default_user_context_helper(data):
+    return data
+
 
 default_settings = {
 
@@ -41,7 +44,8 @@ default_settings = {
         "api_methods" : {},
         "login_helper" : lambda x, y: False,
         "site_context_helper" : default_context_helper,
-        "page_context_helper" : default_context_helper
+        "page_context_helper" : default_context_helper,
+        "user_context_helper" : default_user_context_helper,
     }
 
 

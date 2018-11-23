@@ -39,6 +39,9 @@ class CherryAdminHandler(object):
         self.jinja = jinja2.Environment(
                 loader=jinja2.FileSystemLoader(parent["templates_dir"])
             )
+        self.jinja.filters["format_time"] = format_time
+        self.jinja.filters["s2tc"] = s2tc
+        self.jinja.filters["slugify"] = slugify
 
     def context(self):
         try:
@@ -50,7 +53,7 @@ class CherryAdminHandler(object):
             user_data = {}
         context = CherryAdminContext()
         context.update({
-                "user" : user_data,
+                "user" : self.parent["user_context_helper"](user_data),
                 "site" : self.parent["site_context_helper"](),
                 "page" : self.parent["page_context_helper"](),
             })
@@ -68,20 +71,21 @@ class CherryAdminHandler(object):
         return data
 
 
-    def render_error(self, response_code, message):
+    def render_error(self, response_code, message, traceback=""):
         cherrypy.response.status = response_code
         context = self.context()
         view = CherryAdminView("error", context)
         view["title"] = "Error"
         view.build(
                 response_code=response_code,
-                message=message
+                message=message,
+                traceback=traceback
             )
         return self.render(view)
 
 
     def cherrypy_error(self, status, message, traceback, version):
-        return self.render_error(int(status.split()[0]), message)
+        return self.render_error(int(status.split()[0]), message, traceback)
 
 
     #
@@ -221,7 +225,7 @@ class CherryAdminHandler(object):
         except Exception:
             log_traceback()
             user_data = {}
-        kwargs["user"] = user_data
+        kwargs["user"] = self.parent["user_context_helper"](user_data)
 
         logging.info("{} requested api method {}".format(user_data.get("login", "anonymous"), api_method_name))
 
