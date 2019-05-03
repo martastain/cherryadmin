@@ -81,6 +81,13 @@ class CherryAdminHandler(object):
                 message=message,
                 traceback=traceback
             )
+        logging.error("Error {} ({}) during processing {} request \"{}\"".format(
+                response_code,
+                message,
+                cherrypy.request.method,
+                cherrypy.request.path_info
+                )
+            )
         return self.render(view)
 
 

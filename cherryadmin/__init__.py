@@ -3,6 +3,8 @@ __all__ = ["CherryAdmin", "CherryAdminView", "CherryAdminRawView"]
 import os
 import cherrypy
 
+from nxtools import *
+
 from .handler import CherryAdminHandler
 from .context import CherryAdminContext
 from .view import CherryAdminView, CherryAdminRawView
@@ -27,6 +29,7 @@ default_settings = {
         "sessions_dir" : "/tmp/" + script_name + "_sessions",
         "sessions_timeout" : 60*24*7,
         "minify_html" : True,
+        "log_screen" : False,
 
         #
         # Server configuration
@@ -89,8 +92,9 @@ class CherryAdmin():
             }
 
         cherrypy.config.update({
-            'server.socket_host': str(self["host"]),
-            'server.socket_port': int(self["port"]),
+            "server.socket_host" : str(self["host"]),
+            "server.socket_port" : int(self["port"]),
+            "log.screen" : self["log_screen"]
             })
 
 
@@ -98,6 +102,7 @@ class CherryAdmin():
         cherrypy.engine.subscribe('start', self.start)
         cherrypy.engine.subscribe('stop', self.stop)
         cherrypy.engine.start()
+        logging.goodnews("Web service started")
         if self["blocking"]:
             cherrypy.engine.block()
 
@@ -109,7 +114,7 @@ class CherryAdmin():
         self.is_running = True
 
     def stop(self):
-        print ("CHERRYADMIN >> Engine is now stopped")
+        logging.warning("Web service stopped")
         self.is_running = False
 
     def shutdown(self):
