@@ -250,7 +250,9 @@ class CherryAdminHandler(object):
                     }
             if response["response"] >= 400:
                 logging.error(response.get("message", "Unknown error"))
+            session.release_lock()
             return dump_json(response)
         except Exception:
             message = log_traceback("Exception")
+            session.release_lock()
             return dump_json({"response" : 500, "message" : message})
