@@ -74,6 +74,7 @@ class CherryAdmin():
                 'tools.staticdir.root': static_root,
                 'tools.trailing_slash.on' : False,
                 'tools.sessions.on': True,
+                'tools.sessions.locking': "explicit",
                 'tools.sessions.storage_class' : cherrypy.lib.sessions.FileSession,
                 'tools.sessions.storage_path' : self["sessions_dir"],
                 'tools.sessions.timeout' : self["sessions_timeout"],

@@ -24,11 +24,14 @@ def dump_json(data):
 
 def get_session(handler, id=None):
     if not id:
-        return cherrypy.session
-    session = cherrypy.lib.sessions.FileSession(
-            id=id,
-            storage_path=handler.parent.settings["sessions_dir"]
-            )
+        session = cherrypy.session
+    else:
+        session = cherrypy.lib.sessions.FileSession(
+                id=id,
+                storage_path=handler.parent.settings["sessions_dir"]
+                )
+    if session.locked:
+        session.release_lock()
     session.acquire_lock()
     return session
 
@@ -44,8 +47,9 @@ class CherryAdminHandler(object):
         self.jinja.filters["slugify"] = slugify
 
     def context(self):
+        session = get_session(self)
         try:
-            user_data = cherrypy.session["user_data"]
+            user_data = session["user_data"]
         except KeyError:
             user_data = {}
         except Exception:
@@ -57,6 +61,7 @@ class CherryAdminHandler(object):
                 "site" : self.parent["site_context_helper"](),
                 "page" : self.parent["page_context_helper"](),
             })
+#        session.release_lock()
         return context
 
 
@@ -88,6 +93,7 @@ class CherryAdminHandler(object):
                 cherrypy.request.path_info
                 )
             )
+        logging.debug(traceback)
         return self.render(view)
 
 
@@ -106,21 +112,26 @@ class CherryAdminHandler(object):
         login = kwargs.get("login", "-")
         password = kwargs.get("password", "-")
         user = self.parent["login_helper"](login, password)
+        session = get_session(self)
         if not user:
             if kwargs.get("api", False):
+#                session.release_lock()
                 return dump_json({
                         "response" : 401,
                         "message" : "Invalid user name / password combination",
                         "data" : {},
-                        "session_id" : cherrypy.session.id
+                        "session_id" : session.id
                     })
             raise cherrypy.HTTPRedirect("/")
-        cherrypy.session["user_data"] = user
+
+        session["user_data"] = user
+#        session.release_lock()
+
         if kwargs.get("api", False):
             return dump_json({
                 "response" : 200,
                 "data" : user,
-                "session_id" : cherrypy.session.id
+                "session_id" : session.id
                 })
         raise cherrypy.HTTPRedirect(kwargs.get("from_page", "/"))
 
@@ -168,10 +179,12 @@ class CherryAdminHandler(object):
 
     @cherrypy.expose
     def ping(self, *args, **kwargs):
+        print ("PING")
         for key, value in api_headers:
             cherrypy.response.headers[key] = value
         try:
-            user_data = cherrypy.session["user_data"]
+            session = get_session(self)
+            user_data = session["user_data"]
         except KeyError:
             response = 401
             user_data = {}
@@ -222,7 +235,6 @@ class CherryAdminHandler(object):
             return dump_json({"response" : 400, "message" : message})
 
         context = self.context()
-
         session = get_session(self, kwargs.get("session_id", None))
 
         try:
@@ -250,9 +262,7 @@ class CherryAdminHandler(object):
                     }
             if response["response"] >= 400:
                 logging.error(response.get("message", "Unknown error"))
-            session.release_lock()
             return dump_json(response)
         except Exception:
             message = log_traceback("Exception")
-            session.release_lock()
             return dump_json({"response" : 500, "message" : message})
