@@ -61,7 +61,6 @@ class CherryAdminHandler(object):
                 "site" : self.parent["site_context_helper"](),
                 "page" : self.parent["page_context_helper"](),
             })
-#        session.release_lock()
         return context
 
 
@@ -234,7 +233,6 @@ class CherryAdminHandler(object):
             message = log_traceback("Bad request")
             return dump_json({"response" : 400, "message" : message})
 
-        context = self.context()
         session = get_session(self, kwargs.get("session_id", None))
 
         try:
