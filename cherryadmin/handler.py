@@ -43,8 +43,13 @@ class CherryAdminHandler(object):
                 loader=jinja2.FileSystemLoader(parent["templates_dir"])
             )
         self.jinja.filters["format_time"] = format_time
+        self.jinja.filters["format_filesize"] = format_filesize
         self.jinja.filters["s2tc"] = s2tc
         self.jinja.filters["slugify"] = slugify
+        self.jinja.filters["s2time"] = s2time
+        self.jinja.filters["s2words"] = s2words
+        self.jinja.filters["string2color"] = string2color
+
 
     def context(self):
         session = get_session(self)
@@ -114,7 +119,6 @@ class CherryAdminHandler(object):
         session = get_session(self)
         if not user:
             if kwargs.get("api", False):
-#                session.release_lock()
                 return dump_json({
                         "response" : 401,
                         "message" : "Invalid user name / password combination",
@@ -124,7 +128,6 @@ class CherryAdminHandler(object):
             raise cherrypy.HTTPRedirect("/")
 
         session["user_data"] = user
-#        session.release_lock()
 
         if kwargs.get("api", False):
             return dump_json({
