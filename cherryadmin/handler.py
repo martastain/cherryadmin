@@ -13,13 +13,15 @@ except ImportError:
 
 from nxtools import *
 
-from .common import *
 from .view import *
 from .context import *
 
 
-
-def dump_json(data):
+def dump_json(data, include_headers=True):
+    if include_headers:
+        cherrypy.response.headers["Content-type"] = "application/json"
+        cherrypy.response.headers["Connection"] =  "keep-alive"
+        cherrypy.response.headers["Cache-Control"] =  "no-cache"
     return encode_if_py3(json.dumps(data))
 
 def get_session(handler, id=None):
@@ -181,9 +183,6 @@ class CherryAdminHandler(object):
 
     @cherrypy.expose
     def ping(self, *args, **kwargs):
-        print ("PING")
-        for key, value in api_headers:
-            cherrypy.response.headers[key] = value
         try:
             session = get_session(self)
             user_data = session["user_data"]
@@ -201,8 +200,6 @@ class CherryAdminHandler(object):
 
     @cherrypy.expose
     def api(self, *args, **kwargs):
-        for key, value in api_headers:
-            cherrypy.response.headers[key] = value
 
         if not args:
             return dump_json({
@@ -252,18 +249,40 @@ class CherryAdminHandler(object):
         try:
             api_method = self.parent["api_methods"][api_method_name]
             response = api_method(**kwargs)
-            if type(response) == dict:
-                pass
-            elif hasattr(response, "dict"):
+
+            mime = False
+            if hasattr(response, "mime"):
+                mime = response.mime
+
+            headers = {
+                    "Connection" :"keep-alive",
+                    "Cache-Control" :"no-cache"
+                }
+
+            if hasattr(response, "headers"):
+                headers.update(response.headers)
+
+            if hasattr(response, "payload"):
+                response = response.payload
+
+            if hasattr(response, "dict"):
                 response = response.dict
-            else:
-                response = {
-                        "response" : 500,
-                        "message" : "Unexpected response from API: {}".format(type(response))
-                    }
-            if response["response"] >= 400:
-                logging.error(response.get("message", "Unknown error"))
-            return dump_json(response)
+
+            if type(response) in [list, dict]:
+                mime = "application/json"
+
+            cherrypy.response.headers["Content-Type"] = mime
+            for header in headers:
+                cherrypy.response.headers[header] = headers[header]
+
+            if mime == "application/json":
+                if response.get("response", 200) >= 400:
+                    logging.error(response.get("message", "Unknown error"))
+                return dump_json(response, include_headers=False)
+
+            return response
+
+
         except Exception:
             message = log_traceback("Exception")
             return dump_json({"response" : 500, "message" : message})
