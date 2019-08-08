@@ -92,6 +92,9 @@ class CherryAdminHandler(object):
                 message=message,
                 traceback=traceback
             )
+        if response_code in (401, 403):
+            logging.error("Access denied:", cherrypy.request.path_info)
+            return self.render(view)
         logging.error("Error {} ({}) during processing {} request \"{}\"".format(
                 response_code,
                 message,
@@ -127,6 +130,7 @@ class CherryAdminHandler(object):
                         "data" : {},
                         "session_id" : session.id
                     })
+            return self.default(error="Invalid login/password combination")
             raise cherrypy.HTTPRedirect("/")
 
         session["user_data"] = user
@@ -152,6 +156,19 @@ class CherryAdminHandler(object):
 
 
     @cherrypy.expose
+    def auth(self, *args, **kwargs):
+        session_id = cherrypy.request.headers.get("x-session-id", None)
+        if not session_id:
+            #TODO: do not show default error page
+            raise cherrypy.HTTPError(status=401)
+        session = get_session(self, session_id)
+        if not session.get("user_data"):
+            #TODO: do not show default error page
+            raise cherrypy.HTTPError(status=401)
+        return "OK"
+
+
+    @cherrypy.expose
     def default(self, *args, **kwargs):
         start_time = time.time()
         if not args:
@@ -171,6 +188,9 @@ class CherryAdminHandler(object):
                 cherrypy.response.status = 401
                 context = self.context()
                 context["page"]["title"] = "Login"
+                msg = kwargs.get("error")
+                if msg:
+                    context["page"]["error"] = msg
                 view = CherryAdminView("login", context)
                 view.build()
                 return self.render(view)
@@ -200,7 +220,6 @@ class CherryAdminHandler(object):
 
     @cherrypy.expose
     def api(self, *args, **kwargs):
-
         if not args:
             return dump_json({
                     "response" : 400,
@@ -233,7 +252,9 @@ class CherryAdminHandler(object):
             message = log_traceback("Bad request")
             return dump_json({"response" : 400, "message" : message})
 
-        session = get_session(self, kwargs.get("session_id", None))
+        session_id = cherrypy.request.headers.get("x-session-id", None)
+        session_id = session_id or kwargs.get("session_id", None)
+        session = get_session(self, session_id)
 
         try:
             user_data = session["user_data"]
