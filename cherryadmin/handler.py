@@ -236,21 +236,16 @@ class CherryAdminHandler(object):
                         "message" : "\"{}\" api method not found".format(api_method_name)
                     })
 
-        if cherrypy.request.method != "POST":
-            return dump_json({
-                    "response" : 400,
-                    "message" : "Bad request. Post expected."
-                })
-
-        try:
-            raw_body = decode_if_py3(cherrypy.request.body.read())
-            if raw_body.strip():
-                kwargs = json.loads(raw_body)
-            else:
-                kwargs = {}
-        except Exception:
-            message = log_traceback("Bad request")
-            return dump_json({"response" : 400, "message" : message})
+        if not kwargs and cherrypy.request.method == "POST":
+            try:
+                raw_body = decode_if_py3(cherrypy.request.body.read())
+                if raw_body.strip():
+                    kwargs = json.loads(raw_body)
+                else:
+                    kwargs = {}
+            except Exception:
+                message = log_traceback("Bad request")
+                return dump_json({"response" : 400, "message" : message})
 
         session_id = cherrypy.request.headers.get("x-session-id", None)
         session_id = session_id or kwargs.get("session_id", None)
@@ -303,6 +298,8 @@ class CherryAdminHandler(object):
 
             return response
 
+        except cherrypy.CherryPyException:
+            raise
 
         except Exception:
             message = log_traceback("Exception")
