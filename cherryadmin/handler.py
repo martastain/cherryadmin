@@ -247,7 +247,7 @@ class CherryAdminHandler(object):
                 message = log_traceback("Bad request")
                 return dump_json({"response" : 400, "message" : message})
 
-        session_id = cherrypy.request.headers.get("x-session-id", None)
+        session_id = cherrypy.request.headers.get("x-api-session-id", None)
         session_id = session_id or kwargs.get("session_id", None)
         session = get_session(self, session_id)
 
