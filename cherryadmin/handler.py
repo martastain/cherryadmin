@@ -287,13 +287,24 @@ class CherryAdminHandler(object):
             if type(response) in [list, dict]:
                 mime = "application/json"
 
+            if type(response) == dict and response.get("http_error"):
+                cherrypy.response.status = response.get("response")
+                del(response["http_error"])
+
             cherrypy.response.headers["Content-Type"] = mime
             for header in headers:
                 cherrypy.response.headers[header] = headers[header]
 
             if mime == "application/json":
                 if response.get("response", 200) >= 400:
-                    logging.error(response.get("message", "Unknown error"))
+                    logging.error(
+                            "API Request '{}' by {} failed with code ".format(
+                                    api_method_name,
+                                    user_data.get("login", "anonymous"),
+                                ),
+                            response.get("response"),
+                            response.get("message", "Unknown error")
+                        )
                 return dump_json(response, include_headers=False)
 
             return response
