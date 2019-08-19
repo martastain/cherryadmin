@@ -159,13 +159,13 @@ class CherryAdminHandler(object):
     def auth(self, *args, **kwargs):
         session_id = cherrypy.request.headers.get("x-session-id", None)
         if not session_id:
-            #TODO: do not show default error page
-            raise cherrypy.HTTPError(status=401)
+            cherrypy.response.status = 401
+            return "401"
         session = get_session(self, session_id)
         if not session.get("user_data"):
-            #TODO: do not show default error page
-            raise cherrypy.HTTPError(status=401)
-        return "OK"
+            cherrypy.response.status = 401
+            return "401"
+        return "200"
 
 
     @cherrypy.expose
