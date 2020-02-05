@@ -203,8 +203,10 @@ class CherryAdminHandler(object):
 
     @cherrypy.expose
     def ping(self, *args, **kwargs):
+        session_id = cherrypy.request.headers.get("x-api-session-id", None)
+        session_id = session_id or kwargs.get("session_id", None)
         try:
-            session = get_session(self)
+            session = get_session(self, session_id)
             user_data = session["user_data"]
         except KeyError:
             response = 401
