@@ -24,7 +24,6 @@ def dump_json(data, include_headers=True):
         cherrypy.response.headers["Cache-Control"] =  "no-cache"
     return encode_if_py3(json.dumps(data))
 
-
 def get_session(handler, id=None):
     if not id:
         session = cherrypy.session
@@ -32,7 +31,7 @@ def get_session(handler, id=None):
         session = cherrypy.lib.sessions.FileSession(
                 id=id,
                 storage_path=handler.parent.settings["sessions_dir"]
-            )
+                )
     if session.locked:
         session.release_lock()
     session.acquire_lock()
@@ -63,7 +62,6 @@ class CherryAdminHandler(object):
         except Exception:
             log_traceback()
             user_data = {}
-        session.release_lock()
         context = CherryAdminContext()
         context.update({
                 "user" : self.parent["user_context_helper"](user_data),
@@ -117,32 +115,12 @@ class CherryAdminHandler(object):
     #
 
     @cherrypy.expose
-    def ping(self, *args, **kwargs):
-        session_id = cherrypy.request.headers.get("x-api-session-id", None)
-        session_id = session_id or kwargs.get("session_id", None)
-        session = get_session(self, session_id)
-        try:
-            user_data = session["user_data"]
-        except KeyError:
-            response = 401
-            user_data = {}
-        except Exception:
-            response = 401
-            log_traceback()
-            user_data = {}
-        else:
-            response = 200
-        session.release_lock()
-        return dump_json({"response" : response, "user" : user_data})
-
-    @cherrypy.expose
     def login(self, **kwargs):
         if cherrypy.request.method != "POST":
             return self.render_error(400, "Bad request")
         login = kwargs.get("login", "-")
         password = kwargs.get("password", "-")
         user = self.parent["login_helper"](login, password)
-
         session = get_session(self)
         if not user:
             if kwargs.get("api", False):
@@ -163,7 +141,6 @@ class CherryAdminHandler(object):
                 "data" : user,
                 "session_id" : session.id
                 })
-        session.release_lock()
         raise cherrypy.HTTPRedirect(kwargs.get("from_page", "/"))
 
 
@@ -176,6 +153,19 @@ class CherryAdminHandler(object):
             return dump_json({"response" : 200, "message" : "Logged out"})
         else:
             raise cherrypy.HTTPRedirect("/")
+
+
+    @cherrypy.expose
+    def auth(self, *args, **kwargs):
+        session_id = cherrypy.request.headers.get("x-session-id", None)
+        if not session_id:
+            cherrypy.response.status = 401
+            return "401"
+        session = get_session(self, session_id)
+        if not session.get("user_data"):
+            cherrypy.response.status = 401
+            return "401"
+        return "200"
 
 
     @cherrypy.expose
@@ -211,6 +201,22 @@ class CherryAdminHandler(object):
         return self.render(view)
 
 
+    @cherrypy.expose
+    def ping(self, *args, **kwargs):
+        try:
+            session = get_session(self)
+            user_data = session["user_data"]
+        except KeyError:
+            response = 401
+            user_data = {}
+        except Exception:
+            response = 401
+            log_traceback()
+            user_data = {}
+        else:
+            response = 200
+        return dump_json({"response" : response, "user" : user_data})
+
 
     @cherrypy.expose
     def api(self, *args, **kwargs):
@@ -241,20 +247,20 @@ class CherryAdminHandler(object):
                 message = log_traceback("Bad request")
                 return dump_json({"response" : 400, "message" : message})
 
-
         session_id = cherrypy.request.headers.get("x-api-session-id", None)
         session_id = session_id or kwargs.get("session_id", None)
         session = get_session(self, session_id)
-        user_data = session.get("user_data", {})
-        session.release_lock()
 
-
+        try:
+            user_data = session["user_data"]
+        except KeyError:
+            user_data = {}
+        except Exception:
+            log_traceback()
+            user_data = {}
         kwargs["user"] = self.parent["user_context_helper"](user_data)
 
-        logging.info("{} requested api method {}".format(
-                user_data.get("login", "anonymous"),
-                api_method_name
-            ))
+        logging.info("{} requested api method {}".format(user_data.get("login", "anonymous"), api_method_name))
 
         try:
             api_method = self.parent["api_methods"][api_method_name]
