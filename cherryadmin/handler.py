@@ -17,25 +17,43 @@ from .view import *
 from .context import *
 
 
-def dump_json(data, include_headers=True):
-    if include_headers:
-        cherrypy.response.headers["Content-type"] = "application/json"
-        cherrypy.response.headers["Connection"] =  "keep-alive"
-        cherrypy.response.headers["Cache-Control"] =  "no-cache"
+def json_response(response_code=200, message=None, **kwargs):
+    data = {"response" : response_code}
+    data.update(kwargs)
+    if message:
+        data["message"] = message
+    cherrypy.response.headers["Content-type"] = "application/json"
+    cherrypy.response.headers["Connection"] =  "keep-alive"
+    cherrypy.response.headers["Cache-Control"] =  "no-cache"
     return encode_if_py3(json.dumps(data))
 
-def get_session(handler, id=None):
-    if not id:
-        session = cherrypy.session
-    else:
-        session = cherrypy.lib.sessions.FileSession(
-                id=id,
-                storage_path=handler.parent.settings["sessions_dir"]
-                )
-    if session.locked:
-        session.release_lock()
-    session.acquire_lock()
-    return session
+
+def save_session_cookie(session_id):
+    cookie = cherrypy.response.cookie
+    cookie["session_id"] = session_id
+    cookie["session_id"]['path'] = '/'
+    cookie["session_id"]['max-age'] = 3600*24
+    cookie["session_id"]['version'] = 1
+
+
+def parse_request(**kwargs):
+    data = kwargs
+    if cherrypy.request.method == "POST":
+        try:
+            raw_body = decode_if_py3(cherrypy.request.body.read())
+            if raw_body.strip():
+                data.update(json.loads(raw_body))
+        except Exception:
+            pass
+    if not data.get("session_id", None):
+        try:
+            data["session_id"] = cherrypy.request.cookie["session_id"].value
+        except KeyError:
+            pass
+        except Exception:
+            log_traceback()
+    return data
+
 
 
 class CherryAdminHandler(object):
@@ -52,21 +70,21 @@ class CherryAdminHandler(object):
         self.jinja.filters["s2words"] = s2words
         self.jinja.filters["string2color"] = string2color
 
+    @property
+    def sessions(self):
+        return self.parent.sessions
+
 
     def context(self):
-        session = get_session(self)
-        try:
-            user_data = session["user_data"]
-        except KeyError:
-            user_data = {}
-        except Exception:
-            log_traceback()
-            user_data = {}
+        request = parse_request()
+        session_id = request.get("session_id")
+        user_data = self.sessions.check(session_id)
         context = CherryAdminContext()
         context.update({
                 "user" : self.parent["user_context_helper"](user_data),
                 "site" : self.parent["site_context_helper"](),
                 "page" : self.parent["page_context_helper"](),
+                "session_id" : session_id
             })
         return context
 
@@ -115,57 +133,57 @@ class CherryAdminHandler(object):
     #
 
     @cherrypy.expose
+    def ping(self, **kwargs):
+        request = parse_request(**kwargs)
+        session_id = request.get("session_id")
+        if not session_id:
+            return json_response(401, "Not logged in - no session ID provided")
+        user_data = self.sessions.check(session_id)
+        if not user_data:
+            return json_response(401, "Not logged in - session not found")
+
+        self.sessions.update(session_id, user_data)
+        save_session_cookie(session_id)
+        return json_response(200, user=user_data)
+
+
+    @cherrypy.expose
     def login(self, **kwargs):
         if cherrypy.request.method != "POST":
             return self.render_error(400, "Bad request")
-        login = kwargs.get("login", "-")
-        password = kwargs.get("password", "-")
-        user = self.parent["login_helper"](login, password)
-        session = get_session(self)
-        if not user:
+        request = parse_request(**kwargs)
+        login = request.get("login", "-")
+        password = request.get("password", "-")
+        user_data = self.parent["login_helper"](login, password)
+
+        if not user_data:
             if kwargs.get("api", False):
-                return dump_json({
-                        "response" : 401,
-                        "message" : "Invalid user name / password combination",
-                        "data" : {},
-                        "session_id" : session.id
-                    })
+                return json_response(401, "Invalid user name / password combination")
             return self.default(error="Invalid login/password combination")
             raise cherrypy.HTTPRedirect("/")
 
-        session["user_data"] = user
+        if "password" in user_data:
+            del(user_data["password"])
+
+        session_id = self.sessions.create(user_data)
+        save_session_cookie(session_id)
 
         if kwargs.get("api", False):
-            return dump_json({
-                "response" : 200,
-                "data" : user,
-                "session_id" : session.id
-                })
-        raise cherrypy.HTTPRedirect(kwargs.get("from_page", "/"))
+            return json_response(200, data=user_data, session_id=session_id)
+        raise cherrypy.HTTPRedirect(request.get("from_page", "/"))
 
 
     @cherrypy.expose
     def logout(self, **kwargs):
-        session = get_session(self, kwargs.get("session_id", None))
-        session["user_data"] = False
-        session.delete()
+        request = parse_request(**kwargs)
+        session_id = request.get("session_id")
+        if session_id:
+            self.sessions.delete(session_id)
         if kwargs.get("api"):
-            return dump_json({"response" : 200, "message" : "Logged out"})
+            return json_response(200, "Logged out")
         else:
             raise cherrypy.HTTPRedirect("/")
 
-
-    @cherrypy.expose
-    def auth(self, *args, **kwargs):
-        session_id = cherrypy.request.headers.get("x-session-id", None)
-        if not session_id:
-            cherrypy.response.status = 401
-            return "401"
-        session = get_session(self, session_id)
-        if not session.get("user_data"):
-            cherrypy.response.status = 401
-            return "401"
-        return "200"
 
 
     @cherrypy.expose
@@ -183,10 +201,10 @@ class CherryAdminHandler(object):
 
         view_class = self.parent["views"][view_name]
         view = view_class(view_name, self.context())
+        context = self.context()
         if not view.auth():
             if not view["user"]:
                 cherrypy.response.status = 401
-                context = self.context()
                 context["page"]["title"] = "Login"
                 msg = kwargs.get("error")
                 if msg:
@@ -196,75 +214,37 @@ class CherryAdminHandler(object):
                 return self.render(view)
             return self.render_error(403, "You are not authorized to view this page")
 
+
+        save_session_cookie(context["session_id"])
+
         view.build(*args, **kwargs)
         view["build_time"] = round(time.time() - start_time, 3)
         return self.render(view)
 
 
-    @cherrypy.expose
-    def ping(self, *args, **kwargs):
-        try:
-            session = get_session(self)
-            user_data = session["user_data"]
-        except KeyError:
-            response = 401
-            user_data = {}
-        except Exception:
-            response = 401
-            log_traceback()
-            user_data = {}
-        else:
-            response = 200
-        return dump_json({"response" : response, "user" : user_data})
 
 
     @cherrypy.expose
     def api(self, *args, **kwargs):
         if not args:
-            return dump_json({
-                    "response" : 400,
-                    "message" : "Bad request. No method specified."
-                })
+            return json_response(400, "Bad request. No method specified.")
         else:
             try:
                 api_method_name = args[0]
                 if not api_method_name in self.parent["api_methods"]:
                     raise KeyError
             except KeyError:
-                return dump_json({
-                        "response" : 404,
-                        "message" : "\"{}\" api method not found".format(api_method_name)
-                    })
+                return json_response(404, "{} api method not found".format(api_method_name))
 
-        if not kwargs and cherrypy.request.method == "POST":
-            try:
-                raw_body = decode_if_py3(cherrypy.request.body.read())
-                if raw_body.strip():
-                    kwargs = json.loads(raw_body)
-                else:
-                    kwargs = {}
-            except Exception:
-                message = log_traceback("Bad request")
-                return dump_json({"response" : 400, "message" : message})
-
-        session_id = cherrypy.request.headers.get("x-api-session-id", None)
-        session_id = session_id or kwargs.get("session_id", None)
-        session = get_session(self, session_id)
-
-        try:
-            user_data = session["user_data"]
-        except KeyError:
-            user_data = {}
-        except Exception:
-            log_traceback()
-            user_data = {}
-        kwargs["user"] = self.parent["user_context_helper"](user_data)
+        request = parse_request(**kwargs)
+        user_data = self.sessions.check(request.get("session_id"))
+        request["user"] = self.parent["user_context_helper"](user_data)
 
         logging.info("{} requested api method {}".format(user_data.get("login", "anonymous"), api_method_name))
 
         try:
             api_method = self.parent["api_methods"][api_method_name]
-            response = api_method(**kwargs)
+            response = api_method(**request)
 
             mime = False
             if hasattr(response, "mime"):
@@ -305,8 +285,7 @@ class CherryAdminHandler(object):
                             response.get("response"),
                             response.get("message", "Unknown error")
                         )
-                return dump_json(response, include_headers=False)
-
+                return encode_if_py3(json.dumps(response))
             return response
 
         except cherrypy.CherryPyException:
@@ -314,4 +293,4 @@ class CherryAdminHandler(object):
 
         except Exception:
             message = log_traceback("Exception")
-            return dump_json({"response" : 500, "message" : message})
+            return json_response(500, message)

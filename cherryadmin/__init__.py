@@ -7,10 +7,12 @@ from nxtools import *
 
 from .handler import CherryAdminHandler
 from .context import CherryAdminContext
+from .sessions import CherryAdminSessions
 from .view import CherryAdminView, CherryAdminRawView
 
 
 script_name =  os.path.basename(os.path.splitext(__file__)[0])
+
 def default_context_helper():
     return {}
 
@@ -60,6 +62,11 @@ class CherryAdmin():
 
         self.is_running = False
         self.handler = CherryAdminHandler(self)
+        self.sessions = CherryAdminSessions(
+                    self.settings.get("sessions_dir", "/tmp/sessions"),
+                    self.settings.get("sessions_timeout", 3600*24*30),
+                    self.settings.get("hash_salt", "iamverysaltysalt")
+                )
 
         if not os.path.exists(self["sessions_dir"]):
             os.makedirs(self["sessions_dir"])
@@ -73,11 +80,6 @@ class CherryAdmin():
                 'tools.proxy.local': 'Host',
                 'tools.staticdir.root': static_root,
                 'tools.trailing_slash.on' : False,
-                'tools.sessions.on': True,
-                'tools.sessions.locking': "explicit",
-                'tools.sessions.storage_class' : cherrypy.lib.sessions.FileSession,
-                'tools.sessions.storage_path' : self["sessions_dir"],
-                'tools.sessions.timeout' : self["sessions_timeout"],
                 'error_page.default': self.handler.cherrypy_error,
                 },
 
