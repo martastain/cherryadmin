@@ -59,8 +59,8 @@ class CherryAdminSessions():
         if age > self.max_age/2:
             extend = True
         if extend:
-            data["ctime"] = time.time
-            self.save(session_id, json.dumps(data))
+            data["ctime"] = time.time()
+            self.save(session_id, data)
         return data["user_data"]
 
 
