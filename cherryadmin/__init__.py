@@ -30,6 +30,7 @@ default_settings = {
         "static_dir" : "static",
         "sessions_dir" : "/tmp/" + script_name + "_sessions",
         "sessions_timeout" : 60*24*7,
+        "hash_salt" : "4u5457825749",
         "minify_html" : True,
         "log_screen" : False,
 
@@ -57,19 +58,30 @@ default_settings = {
 
 class CherryAdmin():
     def __init__(self, **kwargs):
+        """
+        host: IP Address the server will listen for HTTP connections
+        port: Port the server will listen for HTTP connection
+        blocking:
+
+        templates_dir:
+        static_dir:
+        sessions_dir:
+        sessions_timeout: Number of minutes after which inactive session session expires
+        hash_salt:
+        minify_html:
+        log_screen:
+        """
+
         self.settings = default_settings
         self.settings.update(kwargs)
 
         self.is_running = False
         self.handler = CherryAdminHandler(self)
         self.sessions = CherryAdminSessions(
-                    self.settings.get("sessions_dir", "/tmp/sessions"),
-                    self.settings.get("sessions_timeout", 3600*24*30),
-                    self.settings.get("hash_salt", "iamverysaltysalt")
+                    self["sessions_dir"],
+                    self["sessions_timeout"] * 60,
+                    self["hash_salt"]
                 )
-
-        if not os.path.exists(self["sessions_dir"]):
-            os.makedirs(self["sessions_dir"])
 
         static_root, static_dir = os.path.split(os.path.abspath(self["static_dir"]))
 

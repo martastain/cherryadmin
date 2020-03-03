@@ -15,6 +15,7 @@ from nxtools import *
 
 from .view import *
 from .context import *
+from .stats import *
 
 
 def json_response(response_code=200, message=None, **kwargs):
@@ -28,11 +29,11 @@ def json_response(response_code=200, message=None, **kwargs):
     return encode_if_py3(json.dumps(data))
 
 
-def save_session_cookie(session_id):
+def save_session_cookie(handler, session_id):
     cookie = cherrypy.response.cookie
     cookie["session_id"] = session_id
     cookie["session_id"]['path'] = '/'
-    cookie["session_id"]['max-age'] = 3600*24
+    cookie["session_id"]['max-age'] = handler.parent["sessions_timeout"] * 60
     cookie["session_id"]['version'] = 1
 
 
@@ -137,14 +138,19 @@ class CherryAdminHandler(object):
         request = parse_request(**kwargs)
         session_id = request.get("session_id")
         if not session_id:
-            return json_response(401, "Not logged in - no session ID provided")
+            msg = "Not logged in - no session ID provided"
+            logging.warning("PING:", msg)
+            return json_response(401, msg)
         user_data = self.sessions.check(session_id)
         if not user_data:
-            return json_response(401, "Not logged in - session not found")
+            msg =  "Not logged in - session {} not found".format(session_id)
+            logging.warning("PING:", msg)
+            return json_response(401, msg)
 
         self.sessions.update(session_id, user_data)
-        save_session_cookie(session_id)
-        return json_response(200, user=user_data)
+        save_session_cookie(self, session_id)
+        logging.debug("PING: Logged in user {}".format(user_data.get("login", "anonymous")))
+        return json_response(200, data=user_data)
 
 
     @cherrypy.expose
@@ -156,7 +162,9 @@ class CherryAdminHandler(object):
         password = request.get("password", "-")
         user_data = self.parent["login_helper"](login, password)
 
+
         if not user_data:
+            logging.error("Incorrect login ({})".format(login))
             if kwargs.get("api", False):
                 return json_response(401, "Invalid user name / password combination")
             return self.default(error="Invalid login/password combination")
@@ -165,8 +173,9 @@ class CherryAdminHandler(object):
         if "password" in user_data:
             del(user_data["password"])
 
+        logging.goodnews("User {} logged in".format(login))
         session_id = self.sessions.create(user_data)
-        save_session_cookie(session_id)
+        save_session_cookie(self, session_id)
 
         if kwargs.get("api", False):
             return json_response(200, data=user_data, session_id=session_id)
@@ -215,7 +224,7 @@ class CherryAdminHandler(object):
             return self.render_error(403, "You are not authorized to view this page")
 
 
-        save_session_cookie(context["session_id"])
+        save_session_cookie(self, context["session_id"])
 
         view.build(*args, **kwargs)
         view["build_time"] = round(time.time() - start_time, 3)
@@ -240,7 +249,14 @@ class CherryAdminHandler(object):
         user_data = self.sessions.check(request.get("session_id"))
         request["user"] = self.parent["user_context_helper"](user_data)
 
-        logging.info("{} requested api method {}".format(user_data.get("login", "anonymous"), api_method_name))
+        user_name = user_data.get("login", "unknown user") if user_data else "anonymous"
+        logging.info("{} requested api method {}".format(user_name, api_method_name))
+
+        if not user_name in request_stats:
+            request_stats[user_name] = {}
+        if not api_method_name in request_stats[user_name]:
+            request_stats[user_name][api_method_name] = 0
+        request_stats[user_name][api_method_name] += 1
 
         try:
             api_method = self.parent["api_methods"][api_method_name]

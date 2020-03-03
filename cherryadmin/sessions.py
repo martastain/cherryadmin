@@ -8,7 +8,7 @@ from nxtools import *
 
 class CherryAdminSessions():
     def __init__(self, sessions_dir, max_age, salt):
-        self.sessions_dir = sessions_dir
+        self.sessions_dir = str(sessions_dir)
         self.max_age = max_age
         self.salt = salt
 
@@ -53,7 +53,7 @@ class CherryAdminSessions():
             return False
         age = time.time() - data.get("ctime", 0)
         if age > self.max_age:
-            logging.debug("Session {} has expired. Removing.".format("session_id"))
+            logging.debug("Session {} has expired. Removing.".format(session_id))
             self.delete(session_id)
             return False
         if age > self.max_age/2:
