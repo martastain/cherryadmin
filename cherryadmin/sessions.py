@@ -2,6 +2,7 @@ import os
 import time
 import json
 import hashlib
+import cherrypy
 
 from nxtools import *
 
@@ -64,22 +65,24 @@ class CherryAdminSessions():
         return data["user_data"]
 
 
-    def create(self, user_data):
+    def create(self, user_data, **kwargs):
         session_id = self.create_session_id()
         data = {
                 "user_data"  : user_data,
-                "ctime"  : time.time()
+                "ctime"  : time.time(),
             }
+        data.update(kwargs)
         if self.save(session_id, data):
             return session_id
         return False
 
 
-    def update(self, session_id, user_data):
+    def update(self, session_id, user_data, **kwargs):
         data = {
                 "user_data"  : user_data,
                 "ctime"  : time.time()
             }
+        data.update(kwargs)
         if self.save(session_id, data):
             return session_id
         return False

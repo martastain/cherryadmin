@@ -56,6 +56,18 @@ def parse_request(**kwargs):
     return data
 
 
+def get_client_info():
+    if "User-Agent" in cherrypy.request.headers:
+        user_agent = cherrypy.request.headers["User-Agent"]
+    if "X-Real-Ip" in cherrypy.request.headers:
+        ip = cherrypy.request.headers["X-Real-Ip"]
+    else:
+        ip = cherrypy.request.headers["Remote-Addr"]
+    return {
+            "ip" : ip,
+            "user_agent" : user_agent
+        }
+
 
 class CherryAdminHandler(object):
     def __init__(self, parent):
@@ -82,6 +94,7 @@ class CherryAdminHandler(object):
         user_data = self.sessions.check(session_id)
         context = CherryAdminContext()
         context.update({
+                "settings" : self.parent.settings,
                 "user" : self.parent["user_context_helper"](user_data),
                 "site" : self.parent["site_context_helper"](),
                 "page" : self.parent["page_context_helper"](),
@@ -128,7 +141,6 @@ class CherryAdminHandler(object):
     def cherrypy_error(self, status, message, traceback, version):
         return self.render_error(int(status.split()[0]), message, traceback)
 
-
     #
     # EXPOSED
     #
@@ -162,7 +174,6 @@ class CherryAdminHandler(object):
         password = request.get("password", "-")
         user_data = self.parent["login_helper"](login, password)
 
-
         if not user_data:
             logging.error("Incorrect login ({})".format(login))
             if kwargs.get("api", False):
@@ -173,8 +184,10 @@ class CherryAdminHandler(object):
         if "password" in user_data:
             del(user_data["password"])
 
+        client_info = get_client_info()
+
         logging.goodnews("User {} logged in".format(login))
-        session_id = self.sessions.create(user_data)
+        session_id = self.sessions.create(user_data, **client_info)
         save_session_cookie(self, session_id)
 
         if kwargs.get("api", False):
