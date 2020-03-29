@@ -135,7 +135,8 @@ class CherryAdminHandler(object):
                 cherrypy.request.path_info
                 )
             )
-        logging.debug(traceback)
+        if traceback:
+            logging.debug(traceback)
         return self.render(view)
 
 
@@ -311,7 +312,7 @@ class CherryAdminHandler(object):
                     logging.error(
                             "API Request '{}' by {} failed with code ".format(
                                     api_method_name,
-                                    user_data.get("login", "anonymous"),
+                                    user_data.get("login", "unknown user") if user_data else "anonymous",
                                 ),
                             response.get("response"),
                             response.get("message", "Unknown error")
