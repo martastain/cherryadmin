@@ -114,12 +114,13 @@ class CherryAdmin():
 
 
         cherrypy.tree.mount(self.handler, "/", self.config)
-        cherrypy.engine.subscribe('start', self.start)
-        cherrypy.engine.subscribe('stop', self.stop)
-        cherrypy.engine.start()
-        logging.goodnews("Web service started")
-        if self["blocking"]:
-            cherrypy.engine.block()
+        if kwargs.get("start_engine", True):
+            cherrypy.engine.subscribe('start', self.start)
+            cherrypy.engine.subscribe('stop', self.stop)
+            cherrypy.engine.start()
+            logging.goodnews("Web service started")
+            if self["blocking"]:
+                cherrypy.engine.block()
 
 
     def __getitem__(self, key):

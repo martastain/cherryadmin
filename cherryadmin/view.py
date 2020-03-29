@@ -7,6 +7,7 @@ class CherryAdminRawView(object):
         self.context["response"] = 200
         self["name"] = name
         self["mime"] = "text/html"
+        self.response = 200
         self.body = ""
 
     @property

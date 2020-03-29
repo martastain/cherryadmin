@@ -105,6 +105,7 @@ class CherryAdminHandler(object):
 
     def render(self, view):
         cherrypy.response.headers["Content-Type"] = view["page"]["mime"]
+        cherrypy.response.status = view.response
         if view.is_raw:
             return encode_if_py3(view.body)
         template = self.jinja.get_template("{}.html".format(view.view))
@@ -226,7 +227,8 @@ class CherryAdminHandler(object):
         context = self.context()
         if not view.auth():
             if not view["user"]:
-                cherrypy.response.status = 401
+                if view_name != "index":
+                    cherrypy.response.status = 401
                 context["page"]["title"] = "Login"
                 msg = kwargs.get("error")
                 if msg:
