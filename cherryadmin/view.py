@@ -4,10 +4,9 @@ class CherryAdminRawView(object):
     def __init__(self, name, context, *args, **kwargs):
         self.context = context
         self.view = name
-        self.context["response"] = 200
+        self["response_code"] = 200
         self["name"] = name
         self["mime"] = "text/html"
-        self.response = 200
         self.body = ""
 
     @property

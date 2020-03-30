@@ -105,7 +105,7 @@ class CherryAdminHandler(object):
 
     def render(self, view):
         cherrypy.response.headers["Content-Type"] = view["page"]["mime"]
-        cherrypy.response.status = view.response
+        cherrypy.response.status = view["page"]["response_code"]
         if view.is_raw:
             return encode_if_py3(view.body)
         template = self.jinja.get_template("{}.html".format(view.view))
@@ -116,7 +116,6 @@ class CherryAdminHandler(object):
 
 
     def render_error(self, response_code, message, traceback=""):
-        cherrypy.response.status = response_code
         context = self.context()
         view = CherryAdminView("error", context)
         view["title"] = "Error"
@@ -228,13 +227,13 @@ class CherryAdminHandler(object):
         context = self.context()
         if not view.auth():
             if not view["user"]:
-                if view_name != "index":
-                    cherrypy.response.status = 401
-                context["page"]["title"] = "Login"
-                msg = kwargs.get("error")
-                if msg:
-                    context["page"]["error"] = msg
                 view = CherryAdminView("login", context)
+                view["title"] = "Login"
+                if view_name != "index":
+                    view["response_code"] = 401
+                if kwargs.get("error"):
+                    view["error"] = kwargs.get("error")
+
                 view.build()
                 return self.render(view)
             return self.render_error(403, "You are not authorized to view this page")
