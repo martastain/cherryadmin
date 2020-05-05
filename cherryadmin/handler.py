@@ -193,7 +193,7 @@ class CherryAdminHandler(object):
         session_id = self.sessions.create(user_data, **client_info)
         save_session_cookie(self, session_id)
 
-        if kwargs.get("api", False):
+        if request.get("api", False):
             return json_response(200, data=user_data, session_id=session_id)
         raise cherrypy.HTTPRedirect(request.get("from_page", "/"))
 
