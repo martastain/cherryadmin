@@ -160,10 +160,13 @@ class CherryAdminHandler(object):
             logging.warning("PING:", msg)
             return json_response(401, msg)
 
-        self.sessions.update(session_id, user_data)
+        client_info = get_client_info()
+        self.sessions.delete(session_id)
+        session_id = self.sessions.create(user_data, **client_info)
+
         save_session_cookie(self, session_id)
         logging.debug("PING: Logged in user {}".format(user_data.get("login", "anonymous")))
-        return json_response(200, data=user_data)
+        return json_response(200, data=user_data, session_id=session_id)
 
 
     @cherrypy.expose
