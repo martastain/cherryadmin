@@ -170,7 +170,9 @@ class CherryAdminHandler(object):
 
 
     @cherrypy.expose
-    def login(self, **kwargs):
+    def login(self, *args, **kwargs):
+        if args:
+            return self.render_error(400, "Bad request")
         if cherrypy.request.method != "POST":
             return self.render_error(400, "Bad request")
         request = parse_request(**kwargs)
