@@ -3,6 +3,7 @@ class CherryAdminRawView(object):
 
     def __init__(self, name, context, *args, **kwargs):
         self.context = context
+        self.template_path = False
         self.view = name
         self["response_code"] = 200
         self["name"] = name

@@ -39,6 +39,7 @@ def save_session_cookie(handler, session_id):
 
 def parse_request(**kwargs):
     data = kwargs
+
     if cherrypy.request.method == "POST":
         try:
             raw_body = decode_if_py3(cherrypy.request.body.read())
@@ -108,10 +109,19 @@ class CherryAdminHandler(object):
         cherrypy.response.status = view["page"]["response_code"]
         if view.is_raw:
             return encode_if_py3(view.body)
-        template = self.jinja.get_template("{}.html".format(view.view))
+        if view.template_path:
+            with open(view.template_path) as f:
+                template = self.jinja.from_string(f.read())
+        else:
+            template = self.jinja.get_template("{}.html".format(view.view))
         data = template.render(**view.context)
         if has_htmlmin and self.parent["minify_html"]:
-            data = htmlmin.minify(data, remove_comments=True, remove_empty_space=True)
+            data = htmlmin.minify(
+                    data,
+                    remove_comments=True,
+                    remove_empty_space=True,
+                    remove_optional_attribute_quotes=False
+                )
         return data
 
 
@@ -227,9 +237,9 @@ class CherryAdminHandler(object):
             except IndexError:
                 return self.render_error(404, "\"{}\" module not found".format(view_name))
 
-        view_class = self.parent["views"][view_name]
-        view = view_class(view_name, self.context())
         context = self.context()
+        view_class = self.parent["views"][view_name]
+        view = view_class(view_name, context)
         if not view.auth():
             if not view["user"]:
                 view = CherryAdminView("login", context)
