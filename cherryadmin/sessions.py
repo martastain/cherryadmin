@@ -17,7 +17,7 @@ class CherryAdminSessions():
             try:
                 os.makedirs(self.sessions_dir)
             except Exception:
-                critical_error("Unable to create sessions directory", self.sessions_dir)
+                critical_error("Unable to create sessions directory {}".format(self.sessions_dir))
 
 
     def load(self, session_id):
