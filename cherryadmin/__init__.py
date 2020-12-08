@@ -88,8 +88,7 @@ class CherryAdmin():
         self.config = {
             '/': {
                 'tools.proxy.on': True,
-                'tools.proxy.local': 'X-Forwarded-Host',
-                'tools.proxy.local': 'Host',
+                'tools.proxy.local': 'Referer',
                 'tools.staticdir.root': static_root,
                 'tools.trailing_slash.on' : False,
                 'error_page.default': self.handler.cherrypy_error,
