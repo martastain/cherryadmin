@@ -275,21 +275,29 @@ class CherryAdminHandler(object):
             except KeyError:
                 return json_response(404, "{} api method not found".format(api_method_name))
 
+        try:
+            api_method = self.parent["api_methods"][api_method_name]
+        except Exception:
+            log_traceback()
+            return json_response(500)
+
         request = parse_request(**kwargs)
         user_data = self.sessions.check(request.get("session_id"))
         request["user"] = self.parent["user_context_helper"](user_data)
-
         user_name = user_data.get("login", "unknown user") if user_data else "anonymous"
-        logging.info("{} requested api method {}".format(user_name, api_method_name))
 
-        if not user_name in request_stats:
-            request_stats[user_name] = {}
-        if not api_method_name in request_stats[user_name]:
-            request_stats[user_name][api_method_name] = 0
-        request_stats[user_name][api_method_name] += 1
+        if hasattr(api_method, "silent") and api_method.silent:
+            pass
+        else:
+            logging.info("{} requested api method {}".format(user_name, api_method_name))
+
+            if not user_name in request_stats:
+                request_stats[user_name] = {}
+            if not api_method_name in request_stats[user_name]:
+                request_stats[user_name][api_method_name] = 0
+            request_stats[user_name][api_method_name] += 1
 
         try:
-            api_method = self.parent["api_methods"][api_method_name]
             response = api_method(**request)
 
             mime = False
