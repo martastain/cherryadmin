@@ -217,7 +217,7 @@ class CherryAdminHandler(object):
         session_id = request.get("session_id")
         if session_id:
             self.sessions.delete(session_id)
-        if kwargs.get("api"):
+        if request.get("api"):
             return json_response(200, "Logged out")
         else:
             raise cherrypy.HTTPRedirect("/")
