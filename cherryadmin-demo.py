@@ -16,13 +16,13 @@ def login_helper(login, password):
 
 def site_context_helper():
     return {
-        "name" : "CherryAdmin"
+        "name": "CherryAdmin"
     }
 
 
 def page_context_helper():
     return {
-        "name" : "La page"
+        "name": "Cherryadmin"
     }
 
 
@@ -36,4 +36,3 @@ admin = CherryAdmin(
     page_context_helper=page_context_helper,
     blocking=True,
 )
-
