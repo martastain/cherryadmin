@@ -1,4 +1,3 @@
-import re
 import time
 import json
 
@@ -11,22 +10,32 @@ try:
 except ImportError:
     has_htmlmin = False
 
-from nxtools import *
+from nxtools import (
+    format_time,
+    format_filesize,
+    s2tc,
+    slugify,
+    s2time,
+    s2words,
+    string2color,
+    logging,
+    log_traceback
+)
 
-from .view import *
-from .context import *
-from .stats import *
+from .view import CherryAdminView
+from .context import CherryAdminContext
+from .stats import request_stats
 
 
 def json_response(response_code=200, message=None, **kwargs):
-    data = {"response" : response_code}
+    data = {"response": response_code}
     data.update(kwargs)
     if message:
         data["message"] = message
     cherrypy.response.headers["Content-type"] = "application/json"
-    cherrypy.response.headers["Connection"] =  "keep-alive"
-    cherrypy.response.headers["Cache-Control"] =  "no-cache"
-    return encode_if_py3(json.dumps(data))
+    cherrypy.response.headers["Connection"] = "keep-alive"
+    cherrypy.response.headers["Cache-Control"] = "no-cache"
+    return json.dumps(data).encode("utf-8")
 
 
 def save_session_cookie(handler, session_id):
@@ -42,7 +51,7 @@ def parse_request(**kwargs):
 
     if cherrypy.request.method == "POST":
         try:
-            raw_body = decode_if_py3(cherrypy.request.body.read())
+            raw_body = cherrypy.request.body.read().decode("utf-8")
             if raw_body.strip():
                 data.update(json.loads(raw_body))
         except Exception:
@@ -65,9 +74,9 @@ def get_client_info():
     else:
         ip = cherrypy.request.headers["Remote-Addr"]
     return {
-            "ip" : ip,
-            "user_agent" : user_agent
-        }
+        "ip": ip,
+        "user_agent": user_agent
+    }
 
 
 class CherryAdminHandler(object):
@@ -88,27 +97,25 @@ class CherryAdminHandler(object):
     def sessions(self):
         return self.parent.sessions
 
-
     def context(self):
         request = parse_request()
         session_id = request.get("session_id")
         user_data = self.sessions.check(session_id)
         context = CherryAdminContext()
         context.update({
-                "settings" : self.parent.settings,
-                "user" : self.parent["user_context_helper"](user_data),
-                "site" : self.parent["site_context_helper"](),
-                "page" : self.parent["page_context_helper"](),
-                "session_id" : session_id
+                "settings": self.parent.settings,
+                "user": self.parent["user_context_helper"](user_data),
+                "site": self.parent["site_context_helper"](),
+                "page": self.parent["page_context_helper"](),
+                "session_id": session_id
             })
         return context
-
 
     def render(self, view):
         cherrypy.response.headers["Content-Type"] = view["page"]["mime"]
         cherrypy.response.status = view["page"]["response_code"]
         if view.is_raw:
-            return encode_if_py3(view.body)
+            return bytes(view.body, "utf-8")
         if view.template_path:
             with open(view.template_path) as f:
                 template = self.jinja.from_string(f.read())
@@ -124,7 +131,6 @@ class CherryAdminHandler(object):
                 )
         return data
 
-
     def render_error(self, response_code, message, traceback=""):
         context = self.context()
         view = CherryAdminView("error", context)
@@ -137,7 +143,7 @@ class CherryAdminHandler(object):
         if response_code in (401, 403):
             logging.error("Access denied:", cherrypy.request.path_info)
             return self.render(view)
-        logging.error("Error {} ({}) during processing {} request \"{}\"".format(
+        logging.error("Error {} ({}) processing {} request \"{}\"".format(
                 response_code,
                 message,
                 cherrypy.request.method,
@@ -147,7 +153,6 @@ class CherryAdminHandler(object):
         if traceback:
             logging.debug(traceback)
         return self.render(view)
-
 
     def cherrypy_error(self, status, message, traceback, version):
         return self.render_error(int(status.split()[0]), message, traceback)
@@ -166,7 +171,7 @@ class CherryAdminHandler(object):
             return json_response(401, msg)
         user_data = self.sessions.check(session_id)
         if not user_data:
-            msg =  "Not logged in - session {} not found".format(session_id)
+            msg = f"Not logged in - session {session_id} not found"
             logging.warning("PING:", msg)
             return json_response(401, msg)
 
@@ -175,9 +180,9 @@ class CherryAdminHandler(object):
         session_id = self.sessions.create(user_data, **client_info)
 
         save_session_cookie(self, session_id)
-        logging.debug("PING: Logged in user {}".format(user_data.get("login", "anonymous")))
+        uname = user_data.get("login", "anonymous")
+        logging.debug(f"PING: Logged in user {uname}")
         return json_response(200, data=user_data, session_id=session_id)
-
 
     @cherrypy.expose
     def login(self, *args, **kwargs):
@@ -191,11 +196,12 @@ class CherryAdminHandler(object):
         user_data = self.parent["login_helper"](login, password)
 
         if not user_data:
-            logging.error("Incorrect login ({})".format(login))
+            logging.error(f"Incorrect login ({login})")
             if kwargs.get("api", False):
-                return json_response(401, "Invalid user name / password combination")
+                return json_response(
+                    401, "Invalid user name / password combination"
+                )
             return self.default(error="Invalid login/password combination")
-            raise cherrypy.HTTPRedirect("/")
 
         if "password" in user_data:
             del(user_data["password"])
@@ -210,7 +216,6 @@ class CherryAdminHandler(object):
             return json_response(200, data=user_data, session_id=session_id)
         raise cherrypy.HTTPRedirect(request.get("from_page", "/"))
 
-
     @cherrypy.expose
     def logout(self, **kwargs):
         request = parse_request(**kwargs)
@@ -222,8 +227,6 @@ class CherryAdminHandler(object):
         else:
             raise cherrypy.HTTPRedirect("/")
 
-
-
     @cherrypy.expose
     def default(self, *args, **kwargs):
         start_time = time.time()
@@ -232,10 +235,10 @@ class CherryAdminHandler(object):
         else:
             try:
                 view_name = args[0]
-                if not view_name in self.parent["views"]:
-                    raise IndexError
             except IndexError:
-                return self.render_error(404, "\"{}\" module not found".format(view_name))
+                return self.render_error(404, "View is not specified")
+            if view_name not in self.parent["views"]:
+                return self.render_error(404, f"View '{view_name}' not found")
 
         context = self.context()
         view_class = self.parent["views"][view_name]
@@ -251,17 +254,15 @@ class CherryAdminHandler(object):
 
                 view.build()
                 return self.render(view)
-            return self.render_error(403, "You are not authorized to view this page")
-
+            return self.render_error(
+                403, "You are not authorized to view this page"
+            )
 
         save_session_cookie(self, context["session_id"])
 
         view.build(*args, **kwargs)
         view["build_time"] = round(time.time() - start_time, 3)
         return self.render(view)
-
-
-
 
     @cherrypy.expose
     def api(self, *args, **kwargs):
@@ -270,10 +271,13 @@ class CherryAdminHandler(object):
         else:
             try:
                 api_method_name = args[0]
-                if not api_method_name in self.parent["api_methods"]:
-                    raise KeyError
-            except KeyError:
-                return json_response(404, "{} api method not found".format(api_method_name))
+            except IndexError:
+                return json_response(404, "No API endpoint specified")
+
+            if api_method_name not in self.parent["api_methods"]:
+                return json_response(
+                    404, f"{api_method_name} endpoint not found"
+                )
 
         try:
             api_method = self.parent["api_methods"][api_method_name]
@@ -284,16 +288,17 @@ class CherryAdminHandler(object):
         request = parse_request(**kwargs)
         user_data = self.sessions.check(request.get("session_id"))
         request["user"] = self.parent["user_context_helper"](user_data)
-        user_name = user_data.get("login", "unknown user") if user_data else "anonymous"
+        user_name = user_data.get("login", "unknown user") \
+            if user_data else "anonymous"
 
         if hasattr(api_method, "silent") and api_method.silent:
             pass
         else:
-            logging.info("{} requested api method {}".format(user_name, api_method_name))
+            logging.info(f"{user_name} requested api method {api_method_name}")
 
-            if not user_name in request_stats:
+            if user_name not in request_stats:
                 request_stats[user_name] = {}
-            if not api_method_name in request_stats[user_name]:
+            if api_method_name not in request_stats[user_name]:
                 request_stats[user_name][api_method_name] = 0
             request_stats[user_name][api_method_name] += 1
 
@@ -305,9 +310,9 @@ class CherryAdminHandler(object):
                 mime = response.mime
 
             headers = {
-                    "Connection" :"keep-alive",
-                    "Cache-Control" :"no-cache"
-                }
+                "Connection": "keep-alive",
+                "Cache-Control": "no-cache"
+            }
 
             if hasattr(response, "headers"):
                 headers.update(response.headers)
@@ -331,15 +336,17 @@ class CherryAdminHandler(object):
 
             if mime == "application/json":
                 if response.get("response", 200) >= 400:
+                    uname = user_data.get("login", "unknown user") \
+                        if user_data else "anonymous"
                     logging.error(
-                            "API Request '{}' by {} failed with code ".format(
-                                    api_method_name,
-                                    user_data.get("login", "unknown user") if user_data else "anonymous",
-                                ),
-                            response.get("response"),
-                            response.get("message", "Unknown error")
-                        )
-                return encode_if_py3(json.dumps(response))
+                        "API Request '{}' by {} failed with code ".format(
+                                api_method_name,
+                                uname,
+                            ),
+                        response.get("response"),
+                        response.get("message", "Unknown error")
+                    )
+                return json.dumps(response).encode("utf-8")
             return response
 
         except cherrypy.CherryPyException:
